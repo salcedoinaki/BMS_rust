@@ -22,12 +22,12 @@ mod simulation {
             }
         }
 
-        /// Update the fuel cell model based on a given load.
-        pub fn update(&mut self, load: f64) {
-            self.current = load;
-            self.voltage = 50.0 - load * 0.1;
-            self.temperature += load * 0.05;
-            self.hydrogen_flow = 1.0 + load * 0.01;
+        /// Update the fuel cell model based on a given current.
+        pub fn update(&mut self, current: f64) {
+            self.current = current;
+            self.voltage = 50.0 - current * 0.1;
+            self.temperature += current * 0.05;
+            self.hydrogen_flow = 1.0 + current * 0.01;
         }
     }
 
@@ -43,14 +43,15 @@ mod simulation {
     impl Battery {
         pub fn new() -> Self {
             Battery {
-                soc: 100.0,
+                soc: 100.0, // Starting fully charged
                 voltage: 48.0,
                 current: 0.0,
                 temperature: 25.0,
             }
         }
 
-        /// Update the battery state given a charge and discharge current.
+        /// Update the battery state given a charge current and a discharge current.
+        /// A positive net current means charging, while a negative net current means discharging.
         pub fn update(&mut self, charge_current: f64, discharge_current: f64) {
             // Calculate net current (charging increases SoC, discharging decreases it)
             let net_current = charge_current - discharge_current;
@@ -120,33 +121,75 @@ mod hal {
         type Output;
         fn read(&self) -> Self::Output;
     }
+}
 
-    // For now, our sensor readings are provided by our simulation.
-    // This module lays the groundwork for integrating real sensor interfaces later.
+mod control {
+    /// A simple proportional controller for adjusting the load based on battery state-of-charge.
+    pub struct Controller {
+        pub desired_soc: f64,
+        kp: f64,
+    }
+    
+    impl Controller {
+        pub fn new(desired_soc: f64, kp: f64) -> Self {
+            Self { desired_soc, kp }
+        }
+        
+        /// Computes the discharge load to be used by the simulation when the battery is above the desired SoC.
+        /// 
+        /// - `current_soc`: The current state-of-charge of the battery.
+        /// - `disturbance`: An external load disturbance (e.g., variable load demand).
+        ///
+        /// If the battery is above the desired SoC, the controller produces a positive load (discharge).
+        pub fn compute_load(&self, current_soc: f64, disturbance: f64) -> f64 {
+            let error = current_soc - self.desired_soc; // positive when battery is overcharged
+            let control_adjustment = self.kp * error;
+            let load = disturbance + control_adjustment;
+            if load < 0.0 { 0.0 } else { load }
+        }
+    }
 }
 
 use simulation::{Battery, FuelCell};
 use sensors::{read_battery_sensor, read_fuel_cell_sensor};
+use control::Controller;
 
 fn main() {
     // Create simulation objects for the fuel cell and battery.
     let mut fuel_cell = FuelCell::new();
     let mut battery = Battery::new();
+    
+    // Create a controller with a desired battery SoC of 70% and a proportional gain of 0.5.
+    let controller = Controller::new(70.0, 0.5);
+    
+    // Define a constant charging current value for when the battery is below the desired SoC.
+    let charging_current = 5.0; // Amps
 
     // Run a simulation loop.
     for step in 0..100 {
-        // Generate a varying load (using a sine function for variability).
-        let load = (step as f64).sin().abs() * 20.0;
-
-        // Update the simulation models.
-        fuel_cell.update(load);
-        // Assume the fuel cell partially charges the battery while the battery is discharging under load.
-        battery.update(load * 0.5, load);
-
+        if battery.soc < controller.desired_soc {
+            // Active charging mode
+            println!("Step {}: Charging mode activated", step);
+            // Update fuel cell to provide a constant charging current.
+            fuel_cell.update(charging_current);
+            // Update battery: apply charging current; no discharge.
+            battery.update(charging_current, 0.0);
+        } else {
+            // Discharge control mode
+            // Simulate an external load disturbance (varies with time).
+            let disturbance = (step as f64).sin().abs() * 10.0;
+            let load = controller.compute_load(battery.soc, disturbance);
+            println!("Step {}: Computed load (discharge) = {:.2}", step, load);
+            // Update fuel cell with the computed load.
+            fuel_cell.update(load);
+            // Update battery: fuel cell partially charges the battery while discharging at full load.
+            battery.update(load * 0.5, load);
+        }
+        
         // Emulate sensor readings.
         let fc_data = read_fuel_cell_sensor(&fuel_cell);
         let bat_data = read_battery_sensor(&battery);
-
+        
         println!("Step {}:", step);
         println!(
             "  Fuel Cell -> Voltage: {:.2} V, Current: {:.2} A, Hydrogen Flow: {:.2}, Temp: {:.2} °C",
@@ -156,8 +199,7 @@ fn main() {
             "  Battery   -> SoC: {:.2} %, Voltage: {:.2} V, Current: {:.2} A, Temp: {:.2} °C",
             bat_data.soc, bat_data.voltage, bat_data.current, bat_data.temperature
         );
-
-        // Pause to simulate time steps.
+        
         thread::sleep(Duration::from_millis(500));
     }
 }
