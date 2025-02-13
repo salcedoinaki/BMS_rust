@@ -4,7 +4,8 @@ use std::thread;
 use std::time::Duration;
 
 mod simulation {
-    /// A fuel cell model with a base open-circuit voltage, internal resistance, and improved temperature dynamics.
+    /// A fuel cell model with a base open-circuit voltage, internal resistance,
+    /// and improved temperature dynamics that now depend on a cooling flag.
     #[derive(Debug)]
     pub struct FuelCell {
         pub voltage: f64,
@@ -27,18 +28,20 @@ mod simulation {
             }
         }
 
-        /// Update the fuel cell based on the load.
-        pub fn update(&mut self, load: f64) {
+        /// Update the fuel cell based on the load and cooling status.
+        /// When `cooling_active` is true, the cooling effect is stronger.
+        pub fn update(&mut self, load: f64, cooling_active: bool) {
             self.current = load;
             self.voltage = self.base_ocv - load * self.r_internal;
             self.hydrogen_flow = 1.0 + 0.05 * load;
-            let dt = 0.5;
-            let ambient = 25.0;
+            let dt = 0.5;           // time step in seconds
+            let ambient = 25.0;     // ambient temperature in °C
             let thermal_mass = 100.0;
-            let heat_generated = load * 2.0;  // adjusted heat generation
-            let cooling_rate = 0.5;           // increased cooling rate
+            let heat_generated = load * 2.0;
+            // Use a higher cooling rate if the actuator (fan) is active.
+            let effective_cooling_rate = if cooling_active { 1.0 } else { 0.5 };
             self.temperature = self.temperature
-                + dt * (heat_generated - cooling_rate * (self.temperature - ambient)) / thermal_mass;
+                + dt * (heat_generated - effective_cooling_rate * (self.temperature - ambient)) / thermal_mass;
         }
     }
 
@@ -263,7 +266,10 @@ fn main() {
     let upper_threshold = 75.0;
     let mut charging_mode = false;
 
-    // Create a simulated temperature sensor.
+    // We'll use a persistent flag for cooling. Initially, it's false.
+    let mut cooling_active = false;
+
+    // Create a simulated temperature sensor for the fuel cell.
     let temp_sensor = SimulatedTemperatureSensor {
         read_fn: {
             let fc = Rc::clone(&fuel_cell);
@@ -281,6 +287,7 @@ fn main() {
 
     // Simulation loop.
     for step in 0..100 {
+        // Decide on the charging/discharge mode based on battery SoC.
         if charging_mode {
             if battery.soc > upper_threshold {
                 charging_mode = false;
@@ -293,30 +300,34 @@ fn main() {
             }
         }
 
+        // Update the fuel cell and battery.
         if charging_mode {
             println!("Step {}: Charging mode activated", step);
-            fuel_cell.borrow_mut().update(charging_current);
+            // Pass the cooling flag into the update.
+            fuel_cell.borrow_mut().update(charging_current, cooling_active);
             battery.update(charging_current, 0.0);
         } else {
             let disturbance = (step as f64).sin().abs() * 10.0;
             let load = pid.compute_load(battery.soc, disturbance);
             println!("Step {}: Computed discharge load = {:.2}", step, load);
-            fuel_cell.borrow_mut().update(load);
+            fuel_cell.borrow_mut().update(load, cooling_active);
             battery.update(load * 0.5, load);
         }
 
+        // Read sensor values.
         let fc_data = read_fuel_cell_sensor(&fuel_cell.borrow());
         let bat_data = read_battery_sensor(&battery);
 
-        // --- Modified threshold: lower threshold (44°C) to see actuator activation ---
+        // Use our hardware interface to read temperature.
         let current_temp = hw_interface.read_temperature();
+        // For demonstration, lower the threshold to 44°C to activate the actuator.
         if current_temp > 44.0 {
             hw_interface.activate_actuator();
         } else {
             hw_interface.deactivate_actuator();
         }
-        let actuator_state = hw_interface.get_actuator_state();
-        // -------------------------------------------------------------------------------
+        // Update our cooling flag with the actuator state for next iteration.
+        cooling_active = hw_interface.get_actuator_state();
 
         println!("Step {}:", step);
         println!(
@@ -330,7 +341,7 @@ fn main() {
         println!(
             "  [HAL] Temperature Sensor: {:.2} °C, Actuator: {}",
             current_temp,
-            if actuator_state { "Activated" } else { "Deactivated" }
+            if hw_interface.get_actuator_state() { "Activated" } else { "Deactivated" }
         );
 
         thread::sleep(Duration::from_millis(500));
