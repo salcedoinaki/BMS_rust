@@ -104,7 +104,7 @@ mod tests {
     fn test_battery_update() {
         let mut bat = Battery::new();
         let initial_soc = bat.soc;
-        bat.update(5.0, 2.0);
+        bat.update(2.0, 5.0); // Now discharge current (5.0) > charging current (2.0)
         assert!(bat.soc < initial_soc, "Battery should discharge if discharge current is greater");
     }
 }
