@@ -33,3 +33,23 @@ pub fn read_battery_sensor(battery: &Battery) -> BatterySensorData {
         temperature: battery.temperature,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::simulation::{Battery, FuelCell};
+
+    #[test]
+    fn test_read_fuel_cell_sensor() {
+        let fc = FuelCell::new();
+        let data = read_fuel_cell_sensor(&fc);
+        assert_eq!(data.voltage, 52.0);
+    }
+
+    #[test]
+    fn test_read_battery_sensor() {
+        let bat = Battery::new();
+        let data = read_battery_sensor(&bat);
+        assert_eq!(data.soc, 100.0);
+    }
+}

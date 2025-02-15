@@ -82,3 +82,24 @@ where
         self.actuator.get_state()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_simulated_temperature_sensor() {
+        let sensor = SimulatedTemperatureSensor { read_fn: || 42.0 };
+        assert_eq!(sensor.read(), 42.0);
+    }
+
+    #[test]
+    fn test_simulated_actuator() {
+        let mut actuator = SimulatedActuator::new();
+        assert!(!actuator.get_state());
+        actuator.set_high();
+        assert!(actuator.get_state());
+        actuator.set_low();
+        assert!(!actuator.get_state());
+    }
+}

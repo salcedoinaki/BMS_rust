@@ -6,7 +6,7 @@ mod hal;
 use simulation::{Battery, FuelCell};
 use sensors::{read_battery_sensor, read_fuel_cell_sensor};
 use control::PidController;
-use hal::{HardwareInterface, SimulatedActuator, SimulatedTemperatureSensor, DigitalOutput};
+use hal::{HardwareInterface, SimulatedActuator, SimulatedTemperatureSensor};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -38,7 +38,7 @@ fn main() {
     // Create a simulated actuator (e.g., a cooling fan).
     let actuator = SimulatedActuator::new();
 
-    // Combine into a hardware interface.
+    // Combine them into a hardware interface.
     let mut hw_interface = HardwareInterface {
         temperature_sensor: temp_sensor,
         actuator,
@@ -62,6 +62,7 @@ fn main() {
         // Update simulation.
         if charging_mode {
             println!("Step {}: Charging mode activated", step);
+            // Pass cooling flag into update.
             fuel_cell.borrow_mut().update(charging_current, cooling_active);
             battery.update(charging_current, 0.0);
         } else {
@@ -72,19 +73,18 @@ fn main() {
             battery.update(load * 0.5, load);
         }
 
-        // Read sensor values.
         let fc_data = read_fuel_cell_sensor(&fuel_cell.borrow());
         let bat_data = read_battery_sensor(&battery);
 
-        // Use the hardware interface to read temperature.
+        // Use our hardware interface to read temperature.
         let current_temp = hw_interface.read_temperature();
-        // For demonstration, we lower the threshold to 44°C.
+        // For demonstration, we lower the activation threshold to 44°C.
         if current_temp > 44.0 {
             hw_interface.activate_actuator();
         } else {
             hw_interface.deactivate_actuator();
         }
-        // Update our cooling flag based on actuator state.
+        // Update our cooling flag based on the actuator state.
         cooling_active = hw_interface.get_actuator_state();
 
         println!("Step {}:", step);

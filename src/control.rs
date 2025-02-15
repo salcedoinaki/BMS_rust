@@ -31,3 +31,16 @@ impl PidController {
         if load < 0.0 { 0.0 } else { load }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pid_controller_output() {
+        let mut pid = PidController::new(70.0, 0.3, 0.05, 0.05, 0.5);
+        let load = pid.compute_load(80.0, 0.0);
+        // With an error of 10, load should be positive.
+        assert!(load > 0.0);
+    }
+}
