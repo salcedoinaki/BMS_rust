@@ -7,9 +7,7 @@ mod sensors;
 mod control;
 mod hal;
 
-// Bring simulation functions into scope.
 use simulation::{Battery, FuelCell};
-use sensors::{read_battery_sensor, read_fuel_cell_sensor};
 use control::PidController;
 use hal::{HardwareInterface, SimulatedActuator, SimulatedTemperatureSensor};
 
@@ -53,7 +51,6 @@ impl Component for Model {
         let upper_threshold = 75.0;
         let charging_current = 8.0;
 
-        // Determine charging/discharge mode based on battery SoC.
         if self.charging_mode {
             if self.battery.soc > upper_threshold {
                 self.charging_mode = false;
@@ -65,21 +62,19 @@ impl Component for Model {
         }
 
         if self.charging_mode {
-            // In charging mode, update the simulation accordingly.
             self.fuel_cell.update(charging_current, self.cooling_active);
             self.battery.update(charging_current, 0.0);
         } else {
-            // In discharge mode, compute a load via the PID controller.
             let disturbance = 10.0; // simplified fixed disturbance
             let load = self.pid.compute_load(self.battery.soc, disturbance);
             self.fuel_cell.update(load, self.cooling_active);
             self.battery.update(load * 0.5, load);
         }
 
-        // Simulate cooling: if fuel cell temperature exceeds 44°C, activate the cooling fan.
+        // Activate cooling if temperature exceeds 44°C.
         self.cooling_active = self.fuel_cell.temperature > 44.0;
 
-        true // trigger re-render
+        true
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
@@ -104,5 +99,5 @@ fn app() -> Html {
 
 #[wasm_bindgen(start)]
 pub fn run_app() {
-    yew::start_app::<Model>();
+    yew::Renderer::<Model>::new().render();
 }
