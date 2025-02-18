@@ -1,2 +1,2 @@
 [wasm-bindgen]
-version = "0.2.99"
+wasm-bindgen = "0.2.100"

@@ -1,9 +1,16 @@
 [package]
-name = "BMS_rust"
+name = "bms_rust"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "console"
+path = "src/main_console.rs"
+
 [dependencies]
 yew = { version = "0.20", features = ["csr"] }
-wasm-bindgen = "0.2.99"
+wasm-bindgen = "0.2.100"
 gloo = "0.5"
