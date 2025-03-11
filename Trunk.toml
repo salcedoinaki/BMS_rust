@@ -1,2 +1,2 @@
-[wasm-bindgen]
-wasm-bindgen = "0.2.100"
+[build]
+wasm-opt = false
