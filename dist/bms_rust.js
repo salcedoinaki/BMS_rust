@@ -208,9 +208,7 @@ function debugString(val) {
     // TODO we could test for more things here, like `Set`s and `Map`s.
     return className;
 }
-/**
- * The WASM entry point. Called automatically after load.
- */
+
 export function run_app() {
     wasm.run_app();
 }

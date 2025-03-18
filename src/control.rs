@@ -62,6 +62,30 @@ impl OxygenController {
     }
 }
 
+pub struct AirSupplyController {
+    pid: PidController,
+    /// Desired oxygen concentration setpoint (for example, 0.21 for ambient air).
+    desired_oxygen: f64,
+}
+
+impl AirSupplyController {
+    pub fn new(kp: f64, ki: f64, kd: f64, dt: f64, desired_oxygen: f64) -> Self {
+        Self {
+            pid: PidController::new(kp, ki, kd, dt),
+            desired_oxygen,
+        }
+    }
+    
+    /// Compute the compressor motor torque command.
+    ///
+    /// A feedforward term (here, a placeholder value) is combined with a PID correction.
+    pub fn compute_motor_torque(&mut self, measured_oxygen: f64) -> f64 {
+        let feedforward = 10.0; // Replace with a value derived from your compressor map if available.
+        let correction = self.pid.compute(self.desired_oxygen, measured_oxygen);
+        feedforward + correction
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
