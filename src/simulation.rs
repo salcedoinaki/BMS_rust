@@ -4,8 +4,7 @@ pub mod manifold;
 use compressor::Compressor;
 use manifold::Manifold;
 
-/// AirSupplySystem encapsulates the compressor and manifold models,
-/// representing the air supply dynamics (including transient filling effects).
+/// Represents the air supply subsystem (compressor and manifold).
 #[derive(Debug)]
 pub struct AirSupplySystem {
     pub compressor: Compressor,
@@ -20,7 +19,7 @@ impl AirSupplySystem {
     pub fn new() -> Self {
         Self {
             compressor: Compressor::new(),
-            // For example, manifold volume = 0.1 m³, temperature = 298 K (25°C), initial pressure = 101325 Pa.
+            // Example: manifold volume = 0.1 m³, temperature = 298 K, initial pressure = ambient.
             manifold: Manifold::new(0.1, 298.0, 101325.0),
             inlet_pressure: 101325.0,
             inlet_temp: 298.0,
@@ -28,49 +27,43 @@ impl AirSupplySystem {
     }
     
     /// Update the air supply system.
-    ///
-    /// * motor_torque: Input torque to the compressor motor.
-    /// * dt: Time step in seconds.
-    /// * mass_flow_out: Mass flow rate drawn by the fuel cell (air outflow).
-    pub fn update(&mut self, motor_torque: f64, dt: f64, mass_flow_out: f64) {
-        // Calculate the required load torque from the compressor.
+    /// 
+    /// Takes:
+    /// - motor_torque: computed compressor torque.
+    /// - dt: time step (s).
+    /// - mass_flow_out: estimated air mass flow rate consumed.
+    /// - is_discharging: flag indicating discharge mode.
+    pub fn update(&mut self, motor_torque: f64, dt: f64, mass_flow_out: f64, is_discharging: bool) {
+        let mass_flow_in = self.compressor.mass_flow(self.inlet_pressure, self.inlet_temp, self.manifold.pressure);
         let load_torque = self.compressor.load_torque(self.inlet_pressure, self.inlet_temp, self.manifold.pressure);
         self.compressor.update(motor_torque, load_torque, dt);
-        let mass_flow_in = self.compressor.mass_flow(self.inlet_pressure, self.inlet_temp, self.manifold.pressure);
-        self.manifold.update(mass_flow_in, mass_flow_out, dt);
+        self.manifold.update(mass_flow_in, mass_flow_out, dt, is_discharging);
     }
 }
 
-/// FuelCell model with enhanced voltage loss decomposition and dynamic membrane hydration.
-/// It now also stores the oxygen concentration as a field.
+/// FuelCell model with enhanced polarization and dynamic hydration.
 #[derive(Debug)]
 pub struct FuelCell {
-    // Electrical and dynamic state
-    pub voltage: f64,       // Stack voltage [V]
-    pub current: f64,       // Load current [A]
-    pub hydrogen_flow: f64, // Hydrogen flow rate
-    pub temperature: f64,   // Cell temperature [°C]
-    pub oxygen_concentration: f64, // Stored oxygen concentration (0 to 1)
+    pub voltage: f64,
+    pub current: f64,
+    pub hydrogen_flow: f64,
+    pub temperature: f64,
+    pub oxygen_concentration: f64, // Stored oxygen concentration (normalized 0-1)
 
-    // Base electrical parameters
-    pub base_ocv: f64,         // Base open-circuit voltage [V]
-    pub r_internal: f64,       // Base internal resistance [Ohm]
-    pub thermal_mass: f64,     // Thermal mass [J/°C]
-    pub cooling_efficiency: f64, // Cooling efficiency coefficient
-    pub ambient_temp: f64,     // Ambient temperature [°C]
+    pub base_ocv: f64,
+    pub r_internal: f64,
+    pub thermal_mass: f64,
+    pub cooling_efficiency: f64,
+    pub ambient_temp: f64,
 
-    // Detailed loss parameters for polarization model
-    pub activation_constant: f64,    // Activation loss parameter (A) [V]
-    pub exchange_current: f64,       // Exchange current (I0) [A]
-    pub concentration_constant: f64, // Concentration loss parameter (B) [V]
-    pub limiting_current: f64,       // Limiting current (I_lim) [A]
+    pub activation_constant: f64,
+    pub exchange_current: f64,
+    pub concentration_constant: f64,
+    pub limiting_current: f64,
 
-    // Membrane hydration and dynamics
-    pub membrane_hydration: f64,      // Hydration level (0.1 to 1.0)
-    pub hydration_time_constant: f64, // Time constant for hydration dynamics [sec]
-
-    // Temperature dependency
-    pub temp_coefficient: f64, // [V/°C] drop in OCV per °C above ambient
+    pub membrane_hydration: f64,
+    pub hydration_time_constant: f64,
+    pub temp_coefficient: f64,
 }
 
 impl FuelCell {
@@ -80,7 +73,7 @@ impl FuelCell {
             current: 0.0,
             hydrogen_flow: 1.0,
             temperature: 45.0,
-            oxygen_concentration: 0.21, // default oxygen fraction for air
+            oxygen_concentration: 0.21,
             base_ocv: 60.0,
             r_internal: 0.1,
             thermal_mass: 120.0,
@@ -97,20 +90,11 @@ impl FuelCell {
     }
 
     /// Update the fuel cell state.
-    ///
-    /// * load: Current load on the stack [A].
-    /// * cooling_active: Whether cooling is active.
-    /// * oxygen_concentration: Measured oxygen concentration (0 to 1).
-    /// * humidity: Desired ambient humidity (0 to 1).
+    /// load: current load (A), cooling_active: cooling flag, oxygen_concentration: computed oxygen, humidity: desired hydration.
     pub fn update(&mut self, load: f64, cooling_active: bool, oxygen_concentration: f64, humidity: f64) {
-        // Update current and oxygen concentration.
         self.current = load;
         self.oxygen_concentration = oxygen_concentration;
-
-        // Compute effective open-circuit voltage considering temperature.
         let effective_ocv = self.base_ocv - self.temp_coefficient * (self.temperature - self.ambient_temp);
-
-        // Loss calculations:
         let v_act = self.activation_constant * (1.0 + load / self.exchange_current).ln();
         let effective_r = self.r_internal / self.membrane_hydration;
         let v_ohm = load * effective_r;
@@ -119,8 +103,6 @@ impl FuelCell {
         } else {
             0.5
         };
-
-        // Compute terminal voltage.
         self.voltage = effective_ocv - (v_act + v_ohm + v_conc);
         if oxygen_concentration < 0.3 {
             self.voltage *= 0.85;
@@ -128,33 +110,22 @@ impl FuelCell {
         if self.membrane_hydration < 0.5 {
             self.voltage *= 0.9;
         }
-
-        // Update hydrogen flow.
         self.hydrogen_flow = 1.0 + 0.07 * load.powf(0.9);
-
-        // Update membrane hydration dynamically (first-order model).
         let dt = 0.5;
         let dh_dt = (humidity - self.membrane_hydration) / self.hydration_time_constant;
         self.membrane_hydration += dh_dt * dt;
         if self.membrane_hydration > 1.0 { self.membrane_hydration = 1.0; }
         if self.membrane_hydration < 0.1 { self.membrane_hydration = 0.1; }
-
-        // Thermal dynamics update.
         let heat_generated = load * 2.5;
         let effective_cooling_rate = if cooling_active { self.cooling_efficiency } else { 0.7 };
         self.temperature += dt * (heat_generated - effective_cooling_rate * (self.temperature - self.ambient_temp)) / self.thermal_mass;
     }
 
-    /// Compute oxygen concentration from a given manifold pressure.
-    ///
-    /// Assumes the oxygen fraction in air is 0.21 and scales linearly with pressure.
+    /// Compute oxygen concentration from manifold pressure.
+    /// Normalizes pressure relative to ambient.
     pub fn compute_oxygen_concentration_from(&self, manifold_pressure: f64) -> f64 {
-        0.21 * (manifold_pressure / 101325.0)
-    }
-    
-    /// Optionally, a getter returning the stored oxygen concentration.
-    pub fn compute_oxygen_concentration(&self) -> f64 {
-        self.oxygen_concentration
+        let ratio = manifold_pressure / 101325.0;
+        ratio.min(1.0)
     }
 }
 
@@ -177,9 +148,14 @@ impl Battery {
         }
     }
 
-    /// Update battery state given charge and discharge currents.
-    pub fn update(&mut self, charge_current: f64, discharge_current: f64) {
-        let net_current = charge_current - discharge_current;
+    /// Update battery state.
+    /// When charging_mode is true, discharge_current is ignored.
+    pub fn update(&mut self, charge_current: f64, discharge_current: f64, charging_mode: bool) {
+        let net_current = if charging_mode {
+            charge_current
+        } else {
+            charge_current - discharge_current
+        };
         self.soc += net_current * 0.1;
         if self.soc > 100.0 { self.soc = 100.0; }
         if self.soc < 0.0 { self.soc = 0.0; }
