@@ -5,7 +5,7 @@ mod hal;
 
 use simulation::{FuelCell, Battery, AirSupplySystem};
 use sensors::{read_fuel_cell_sensor, read_battery_sensor};
-use control::{PidController, OxygenController, AirSupplyController}; // New controller
+use control::{PidController, OxygenController, AirSupplyController, BatteryController}; // New controller
 use wasm_bindgen::prelude::*; // for #[wasm_bindgen(start)]
 use yew::prelude::*;          // for Yew components
 use gloo::timers::callback::Interval; // for periodic updates
@@ -17,6 +17,7 @@ struct Model {
     air_supply: AirSupplySystem,
     oxygen_controller: OxygenController,
     air_supply_controller: AirSupplyController, // our new controller
+    battery_controller: BatteryController, // our new controller
     charging_mode: bool,
     cooling_active: bool,
     interval: Interval,
@@ -39,6 +40,9 @@ impl Component for Model {
         let oxygen_controller = OxygenController::new(0.5, 0.1, 0.01, 0.5);
         // Create AirSupplyController with PID gains and desired oxygen concentration.
         let air_supply_controller = AirSupplyController::new(0.5, 0.05, 0.05, 0.5, 0.21);
+        //let battery_controller = BatteryController { lower_threshold: 65.0, upper_threshold: 75.0, charging_mode: false };
+        let battery_controller = BatteryController::new(65.0, 75.0);
+
         let charging_mode = false;
         let cooling_active = false;
         let link = ctx.link().clone();
@@ -54,6 +58,7 @@ impl Component for Model {
             charging_mode,
             cooling_active,
             interval,
+            battery_controller
         }
     }
 
@@ -63,7 +68,7 @@ impl Component for Model {
                 // Battery mode switching (hysteresis-based)
                 let lower_threshold = 65.0;
                 let upper_threshold = 75.0;
-                if self.charging_mode {
+                /* if self.charging_mode {
                     if self.battery.soc > upper_threshold {
                         self.charging_mode = false;
                     }
@@ -71,8 +76,9 @@ impl Component for Model {
                     if self.battery.soc < lower_threshold {
                         self.charging_mode = true;
                     }
-                }
-
+                } */
+                self.charging_mode = self.battery_controller.update_mode(self.battery.soc);
+                
                 // Read fuel cell sensor data.
                 let fc_data = read_fuel_cell_sensor(&self.fuel_cell);
                 
@@ -129,6 +135,7 @@ impl Component for Model {
             </div>
         }
     }
+    
 }
 
 #[wasm_bindgen(start)]

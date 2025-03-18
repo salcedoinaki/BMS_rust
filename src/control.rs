@@ -86,6 +86,42 @@ impl AirSupplyController {
     }
 }
 
+pub struct BatteryController {
+    lower_threshold: f64,
+    upper_threshold: f64,
+    // Tracks the current mode: true if charging, false if discharging.
+    pub charging_mode: bool,
+}
+
+impl BatteryController {
+    /// Create a new BatteryController with given lower and upper thresholds.
+    pub fn new(lower_threshold: f64, upper_threshold: f64) -> Self {
+        Self {
+            lower_threshold,
+            upper_threshold,
+            charging_mode: false, // default mode: not charging
+        }
+    }
+
+    /// Update the charging mode based on the current State-of-Charge (SoC).
+    ///
+    /// If SoC is below the lower threshold, switch to charging mode.
+    /// If SoC is above the upper threshold, switch to discharging mode.
+    /// Otherwise, keep the current mode.
+    pub fn update_mode(&mut self, soc: f64) -> bool {
+        if self.charging_mode {
+            if soc >= self.upper_threshold {
+                self.charging_mode = false;
+            }
+        } else {
+            if soc <= self.lower_threshold {
+                self.charging_mode = true;
+            }
+        }
+        self.charging_mode
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
