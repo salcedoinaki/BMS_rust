@@ -1,2 +1,7 @@
 [build]
 wasm-opt = false
+filehash = false
+
+[wasm-bindgen]
+out-dir = "dist"
+target = "web"

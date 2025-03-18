@@ -123,6 +123,10 @@ impl Component for Model {
                     self.fuel_cell.temperature
                 )}</p>
                 <p>{ format!(
+                    "Membrane Hydration: {:.2}",
+                    self.fuel_cell.membrane_hydration
+                )}</p>
+                <p>{ format!(
                     "Battery  -> SoC: {:.2} %, V: {:.2} V, I: {:.2} A",
                     self.battery.soc,
                     self.battery.voltage,
