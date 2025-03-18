@@ -32,7 +32,7 @@ impl Component for Model {
     type Properties = ();
 
     fn create(ctx: &Context<Self>) -> Self {
-        // Create the components of the simulation.
+        // Create the simulation components.
         let fuel_cell = FuelCell::new();
         let battery = Battery::new();
         let air_supply = AirSupplySystem::new();
@@ -62,7 +62,7 @@ impl Component for Model {
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::Tick => {
-                // Simple SoC thresholds for switching charging mode.
+                // Switching charging mode based on battery SoC thresholds.
                 let lower_threshold = 65.0;
                 let upper_threshold = 75.0;
                 if self.charging_mode {
@@ -75,15 +75,15 @@ impl Component for Model {
                     }
                 }
 
-                // Read sensor data from the fuel cell and battery.
+                // Read sensor data.
                 let fc_data = read_fuel_cell_sensor(&self.fuel_cell);
                 let _bat_data = read_battery_sensor(&self.battery);
 
-                // Define disturbance and desired humidity.
+                // Disturbance and desired humidity.
                 let disturbance = 10.0;
                 let humidity = 0.8;
 
-                // Determine load based on charging mode and oxygen control.
+                // Determine load using oxygen control.
                 let load = if self.charging_mode {
                     8.0 // charging current
                 } else {
@@ -92,7 +92,7 @@ impl Component for Model {
                         + disturbance
                 };
 
-                // Activate cooling if temperature exceeds threshold.
+                // Cooling control based on temperature threshold.
                 if self.fuel_cell.temperature > 44.0 {
                     self.cooling_active = true;
                 } else {
@@ -100,15 +100,14 @@ impl Component for Model {
                 }
 
                 // Update the air supply system.
-                // Assume a constant motor torque and compute mass flow out from fuel cell's hydrogen flow.
-                let motor_torque = 10.0;
+                let motor_torque = 10.0;  // example fixed motor torque
                 let dt = 0.5;
-                let mass_flow_out = self.fuel_cell.hydrogen_flow * 0.05;
+                let mass_flow_out = self.fuel_cell.hydrogen_flow * 0.05; // estimate outflow
                 self.air_supply.update(motor_torque, dt, mass_flow_out);
 
-                // Compute oxygen concentration based on the updated manifold pressure.
+                // Compute oxygen concentration from the updated manifold pressure.
                 let oxygen_concentration =
-                    self.fuel_cell.compute_oxygen_concentration(self.air_supply.manifold.pressure);
+                    self.fuel_cell.compute_oxygen_concentration_from(self.air_supply.manifold.pressure);
 
                 // Update fuel cell and battery states.
                 self.fuel_cell
@@ -128,6 +127,7 @@ impl Component for Model {
                     self.fuel_cell.voltage, self.fuel_cell.current, self.fuel_cell.temperature) }</p>
                 <p>{ format!("Membrane Hydration: {:.2}", self.fuel_cell.membrane_hydration) }</p>
                 <p>{ format!("Manifold Pressure: {:.2} Pa", self.air_supply.manifold.pressure) }</p>
+                <p>{ format!("Oxygen Concentration: {:.2}", self.fuel_cell.oxygen_concentration) }</p>
                 <p>{ format!("Battery -> SoC: {:.2} %, V: {:.2} V, I: {:.2} A",
                     self.battery.soc, self.battery.voltage, self.battery.current) }</p>
                 <p>{ format!("Charging Mode: {}", if self.charging_mode { "Yes" } else { "No" }) }</p>
