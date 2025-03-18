@@ -1,4 +1,4 @@
-use crate::simulation::{Battery, FuelCell};
+use crate::simulation::{FuelCell, Battery};
 
 #[derive(Debug)]
 pub struct FuelCellSensorData {
@@ -6,6 +6,7 @@ pub struct FuelCellSensorData {
     pub current: f64,
     pub hydrogen_flow: f64,
     pub temperature: f64,
+    pub oxygen_concentration: f64, // Field for oxygen sensing
 }
 
 #[derive(Debug)]
@@ -22,6 +23,7 @@ pub fn read_fuel_cell_sensor(fuel_cell: &FuelCell) -> FuelCellSensorData {
         current: fuel_cell.current,
         hydrogen_flow: fuel_cell.hydrogen_flow,
         temperature: fuel_cell.temperature,
+        oxygen_concentration: fuel_cell.compute_oxygen_concentration(),
     }
 }
 
