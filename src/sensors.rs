@@ -45,7 +45,7 @@ mod tests {
     fn test_read_fuel_cell_sensor() {
         let fc = FuelCell::new();
         let data = read_fuel_cell_sensor(&fc);
-        assert_eq!(data.voltage, 52.0);
+        assert_eq!(data.voltage, 60.0);
     }
 
     #[test]

@@ -3,18 +3,19 @@ mod sensors;
 mod control;
 mod hal;
 
-use simulation::{FuelCell, Battery};             // if you want Battery or FuelCell
+use simulation::{FuelCell, Battery};
 use sensors::{read_fuel_cell_sensor, read_battery_sensor};
-use control::{PidController};
-use wasm_bindgen::prelude::*;                    // for #[wasm_bindgen(start)]
-use yew::prelude::*;                             // for the Yew framework
-use gloo::timers::callback::Interval;            // for periodic updates/ticks
+use control::{PidController, OxygenController};
+use wasm_bindgen::prelude::*; // for #[wasm_bindgen(start)]
+use yew::prelude::*;          // for the Yew framework
+use gloo::timers::callback::Interval; // for periodic updates/ticks
 
 /// A Yew component (the main GUI model).
 struct Model {
     fuel_cell: FuelCell,
     battery: Battery,
     pid: PidController,
+    oxygen_controller: OxygenController,
     charging_mode: bool,
     cooling_active: bool,
     interval: Interval,
@@ -33,11 +34,10 @@ impl Component for Model {
         // Construct your data here
         let fuel_cell = FuelCell::new();
         let battery = Battery::new();
-        // Suppose we need a PID for oxygen or SoC control
         let pid = PidController::new(0.3, 0.05, 0.05, 0.5);
+        let oxygen_controller = OxygenController::new(0.5, 0.1, 0.01, 0.5);
 
-        // Example thresholds
-        let mut charging_mode = false;
+        let charging_mode = false;
         let cooling_active = false;
 
         // Create an interval to send ticks
@@ -50,6 +50,7 @@ impl Component for Model {
             fuel_cell,
             battery,
             pid,
+            oxygen_controller,
             charging_mode,
             cooling_active,
             interval,
@@ -59,8 +60,7 @@ impl Component for Model {
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::Tick => {
-                // Place your update logic here:
-                // E.g., check if battery SoC is below a threshold => charge
+                // Example update logic for the simulation
                 let lower_threshold = 65.0;
                 let upper_threshold = 75.0;
                 if self.charging_mode {
@@ -75,48 +75,44 @@ impl Component for Model {
 
                 // Read sensors
                 let fc_data = read_fuel_cell_sensor(&self.fuel_cell);
-                let bat_data = read_battery_sensor(&self.battery);
+                let _bat_data = read_battery_sensor(&self.battery);
 
-                // Disturbance
-                let disturbance = 10.0; // your custom logic
-                // Example humidity & oxygen usage
+                // Disturbance and humidity
+                let disturbance = 10.0;
                 let humidity = 0.8;
 
                 // Decide load
                 let load = if self.charging_mode {
                     8.0 // charging current
                 } else {
-                    // Use the pid to track oxygen
-                    let pid_output = self.pid.compute(2.0, fc_data.oxygen_concentration);
-                    pid_output + disturbance
+                    // Using adaptive control for oxygen regulation
+                    self.oxygen_controller
+                        .regulate_adaptive(2.0, fc_data.oxygen_concentration)
+                        + disturbance
                 };
 
-                // Suppose we set cooling_active if temperature is high
+                // Cooling control based on temperature
                 if self.fuel_cell.temperature > 44.0 {
                     self.cooling_active = true;
                 } else {
                     self.cooling_active = false;
                 }
 
-                // Update the fuel cell (4 arguments)
+                // Update the fuel cell and battery states
                 self.fuel_cell.update(
                     load,
                     self.cooling_active,
                     fc_data.oxygen_concentration,
-                    humidity
+                    humidity,
                 );
-
-                // Update the battery
                 self.battery.update(load * 0.5, load);
 
-                // Return true => re-render if data changed
                 true
             }
         }
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
-        // Basic UI in Yew
         html! {
             <div style="font-family: sans-serif;">
                 <h1>{ "BMS Simulation (Web)" }</h1>
@@ -148,6 +144,5 @@ impl Component for Model {
 /// The WASM entry point. Called automatically after load.
 #[wasm_bindgen(start)]
 pub fn run_app() {
-    // Renders our Yew Model to the DOM
     yew::Renderer::<Model>::new().render();
 }

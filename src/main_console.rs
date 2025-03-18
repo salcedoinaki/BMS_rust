@@ -55,10 +55,15 @@ fn main() {
         let load = if charging_mode {
             charging_current
         } else {
-            oxygen_controller.regulate(2.0, fuel_data.oxygen_concentration) + disturbance
+            // Use adaptive oxygen control
+            oxygen_controller
+                .regulate_adaptive(2.0, fuel_data.oxygen_concentration)
+                + disturbance
         };
 
-        fuel_cell.borrow_mut().update(load, cooling_active, fuel_data.oxygen_concentration, humidity);
+        fuel_cell
+            .borrow_mut()
+            .update(load, cooling_active, fuel_data.oxygen_concentration, humidity);
         battery.update(load * 0.5, load);
 
         if hw_interface.read_temperature() > 44.0 {
