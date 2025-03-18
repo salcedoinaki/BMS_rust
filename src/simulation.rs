@@ -73,7 +73,7 @@ impl FuelCell {
             current: 0.0,
             hydrogen_flow: 1.0,
             temperature: 45.0,
-            oxygen_concentration: 0.21,
+            oxygen_concentration: 1.0,
             base_ocv: 60.0,
             r_internal: 0.1,
             thermal_mass: 120.0,
