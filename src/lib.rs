@@ -21,6 +21,7 @@ struct Model {
     charging_mode: bool,
     cooling_active: bool,
     interval: Interval,
+    debug_log: Vec<String>, // Accumulated debug output
 }
 
 /// Messages for our Yew component.
@@ -42,7 +43,7 @@ impl Component for Model {
         let air_supply_controller = AirSupplyController::new(0.5, 0.05, 0.05, 0.5, 0.21);
         //let battery_controller = BatteryController { lower_threshold: 65.0, upper_threshold: 75.0, charging_mode: false };
         let battery_controller = BatteryController::new(65.0, 75.0);
-
+        let debug_log = Vec::new(); // Start with an empty log
         let charging_mode = false;
         let cooling_active = false;
         let link = ctx.link().clone();
@@ -58,7 +59,8 @@ impl Component for Model {
             charging_mode,
             cooling_active,
             interval,
-            battery_controller
+            battery_controller,
+            debug_log,
         }
     }
 
@@ -114,12 +116,29 @@ impl Component for Model {
                 // Update battery state.
                 self.battery.update(load * 0.5, load);
                 
+                let log_entry = format!(
+                    "V: {:.2} V, I: {:.2} A, Temp: {:.2} °C, Hydration: {:.2}, SOC: {:.2}%, MPress: {:.2} Pa, O2: {:.2}",
+                    self.fuel_cell.voltage,
+                    self.fuel_cell.current,
+                    self.fuel_cell.temperature,
+                    self.fuel_cell.membrane_hydration,
+                    self.battery.soc,
+                    self.air_supply.manifold.pressure,
+                    oxygen_concentration,
+                );
+                self.debug_log.push(log_entry);
+                
+                // Limit log size to the latest 50 entries.
+                if self.debug_log.len() > 50 {
+                    self.debug_log.drain(0..(self.debug_log.len() - 50));
+                }
+                
                 true
             }
         }
     }
 
-    fn view(&self, _ctx: &Context<Self>) -> Html {
+/*     fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
             <div style="font-family: sans-serif;">
                 <h1>{ "BMS Simulation (Web) - Air Supply Controller Integrated" }</h1>
@@ -134,8 +153,27 @@ impl Component for Model {
                 <p>{ format!("Cooling Active: {}", if self.cooling_active { "Yes" } else { "No" }) }</p>
             </div>
         }
+    } */
+    fn view(&self, _ctx: &Context<Self>) -> Html {
+        // Join the debug log entries into one string separated by newlines.
+        let debug_text = self.debug_log.join("\n");
+        html! {
+            <div style="font-family: sans-serif;">
+                <h1>{ "BMS Simulation (Web) - Debug Output" }</h1>
+                <p>{ format!("FuelCell -> V: {:.2} V, I: {:.2} A, Temp: {:.2} °C", self.fuel_cell.voltage, self.fuel_cell.current, self.fuel_cell.temperature) }</p>
+                <p>{ format!("Membrane Hydration: {:.2}", self.fuel_cell.membrane_hydration) }</p>
+                <p>{ format!("Manifold Pressure: {:.2} Pa", self.air_supply.manifold.pressure) }</p>
+                <p>{ format!("Oxygen Concentration: {:.2}", self.fuel_cell.oxygen_concentration) }</p>
+                <p>{ format!("Battery -> SoC: {:.2} %, V: {:.2} V, I: {:.2} A", self.battery.soc, self.battery.voltage, self.battery.current) }</p>
+                <p>{ format!("Charging Mode: {}", if self.charging_mode { "Yes" } else { "No" }) }</p>
+                <p>{ format!("Cooling Active: {}", if self.cooling_active { "Yes" } else { "No" }) }</p>
+                <h2>{ "Debug Log:" }</h2>
+                <pre style="background-color: #f0f0f0; padding: 10px; max-height: 300px; overflow-y: scroll;">
+                    { debug_text }
+                </pre>
+            </div>
+        }
     }
-    
 }
 
 #[wasm_bindgen(start)]
