@@ -1,6 +1,4 @@
-// manifold.rs
-
-/// A simple manifold model using a lumped volume and the ideal gas law.
+#[derive(Debug)]
 pub struct Manifold {
     /// Current pressure in the manifold [Pa]
     pub pressure: f64,

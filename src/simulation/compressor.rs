@@ -1,8 +1,4 @@
-// compressor.rs
-
-/// A simplified compressor model.
-/// It computes the mass flow rate based on compressor speed and operating conditions,
-/// and updates its rotational speed using a dynamic model.
+#[derive(Debug)]
 pub struct Compressor {
     /// Rotational speed (rad/s)
     pub speed: f64,
@@ -33,7 +29,7 @@ impl Compressor {
     /// Compute the compressor mass flow rate [kg/s] using a simplified compressor map.
     ///
     /// This placeholder function uses an exponential decay with respect to the pressure ratio.
-    pub fn mass_flow(&self, inlet_pressure: f64, inlet_temp: f64, outlet_pressure: f64) -> f64 {
+    pub fn mass_flow(&self, inlet_pressure: f64, _inlet_temp: f64, outlet_pressure: f64) -> f64 {
         // Pressure ratio: outlet/inlet
         let pressure_ratio = outlet_pressure / inlet_pressure;
         // Constants (these would be obtained via curve fitting in a real system)
