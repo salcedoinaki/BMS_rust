@@ -2,7 +2,6 @@ mod simulation;
 mod sensors;
 mod control;
 mod hal;
-//mod controllers; // Your controllers folder containing AirSupplyController and BatteryController
 
 use simulation::{FuelCell, Battery, AirSupplySystem};
 use sensors::{read_fuel_cell_sensor, read_battery_sensor};
@@ -21,8 +20,10 @@ struct Model {
     battery_controller: BatteryController,       // battery SoC controller
     charging_mode: bool,
     cooling_active: bool,
-    interval: Interval,
+    interval: Option<Interval>,
     debug_log: Vec<String>, // Accumulated debug output
+    simulation_time: f64,   // Elapsed simulation time in seconds
+    simulation_duration: f64, // Total simulation duration (e.g., 60 seconds)
 }
 
 /// Messages for our Yew component.
@@ -45,10 +46,14 @@ impl Component for Model {
         let charging_mode = false;
         let cooling_active = false;
         let debug_log = Vec::new();
+        let simulation_time = 0.0;
+        let simulation_duration = 60.0; // run for 60 seconds
+
         let link = ctx.link().clone();
         let interval = Interval::new(500, move || {
             link.send_message(Msg::Tick);
         });
+
         Self {
             fuel_cell,
             battery,
@@ -58,25 +63,39 @@ impl Component for Model {
             battery_controller,
             charging_mode,
             cooling_active,
-            interval,
+            interval: Some(interval),
             debug_log,
+            simulation_time,
+            simulation_duration,
         }
     }
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::Tick => {
+                let dt = 0.5;
+                self.simulation_time += dt;
+                
+                // Stop simulation after the fixed duration.
+                if self.simulation_time >= self.simulation_duration {
+                    // Take ownership and cancel the interval.
+                    if let Some(interval) = self.interval.take() {
+                        interval.cancel();
+                    }
+                    self.debug_log.push(format!("Simulation ended at {:.2} seconds.", self.simulation_time));
+                    return true;
+                }
+                
                 // Update battery mode (hysteresis-based).
                 self.charging_mode = self.battery_controller.update_mode(self.battery.soc);
 
-                // Read sensor data.
+                // Read fuel cell sensor data.
                 let fc_data = read_fuel_cell_sensor(&self.fuel_cell);
 
                 // Compute compressor motor torque from AirSupplyController.
                 let motor_torque = self.air_supply_controller.compute_motor_torque(fc_data.oxygen_concentration);
 
-                // Define time step and estimate mass flow out.
-                let dt = 0.5;
+                // Estimate mass flow out and update air supply.
                 let mass_flow_out = self.fuel_cell.hydrogen_flow * 0.05;
                 let is_discharging = !self.charging_mode;
                 self.air_supply.update(motor_torque, dt, mass_flow_out, is_discharging);
@@ -99,16 +118,17 @@ impl Component for Model {
                 let humidity = 0.8; // Base humidity value
                 self.fuel_cell.update(load, self.cooling_active, oxygen_concentration, humidity);
 
-                // Update battery state based on mode.
+                // Update battery state.
                 if self.charging_mode {
                     self.battery.update(8.0, 0.0, true);
                 } else {
                     self.battery.update(0.0, load, false);
                 }
 
-                // Append a new debug log entry.
+                // Append a debug log entry.
                 let log_entry = format!(
-                    "V: {:.2} V, I: {:.2} A, Temp: {:.2} °C, Hydration: {:.2}, SOC: {:.2}%, MPress: {:.2} Pa, O2: {:.2}",
+                    "t: {:.1}s | V: {:.2} V, I: {:.2} A, Temp: {:.2} °C, Hydration: {:.2}, SOC: {:.2}%, MPress: {:.2} Pa, O2: {:.2}",
+                    self.simulation_time,
                     self.fuel_cell.voltage,
                     self.fuel_cell.current,
                     self.fuel_cell.temperature,
@@ -118,9 +138,10 @@ impl Component for Model {
                     oxygen_concentration,
                 );
                 self.debug_log.push(log_entry);
-                if self.debug_log.len() > 50 {
-                    self.debug_log.drain(0..(self.debug_log.len() - 50));
+                if self.debug_log.len() > 120 {
+                    self.debug_log.drain(0..(self.debug_log.len() - 120));
                 }
+                
                 true
             }
         }
@@ -131,6 +152,7 @@ impl Component for Model {
         html! {
             <div style="font-family: sans-serif;">
                 <h1>{ "BMS Simulation (Web) - Debug Output" }</h1>
+                <p>{ format!("Simulation Time: {:.1} s / {:.1} s", self.simulation_time, self.simulation_duration) }</p>
                 <p>{ format!("FuelCell -> V: {:.2} V, I: {:.2} A, Temp: {:.2} °C",
                     self.fuel_cell.voltage, self.fuel_cell.current, self.fuel_cell.temperature) }</p>
                 <p>{ format!("Membrane Hydration: {:.2}", self.fuel_cell.membrane_hydration) }</p>
