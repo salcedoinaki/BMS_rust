@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>BMS Simulation Test</title>
+    <base href="./">
+  </head>
+  <body>
+    <div id="root"></div>
+    
+    <script type="module">
+      console.log("Starting WASM initialization test...");
+
+      import init, * as bindings from './bms_rust.js';
+      (async () => {
+        try {
+          const wasm = await init({ module_or_path: './bms_rust_bg.wasm' });
+          console.log("WASM module loaded successfully:", wasm);
+          window.wasmBindings = bindings;
+          // Update the page so you can see something:
+          document.getElementById('root').innerText = "WASM loaded successfully!";
+        } catch (error) {
+          console.error("Error during WASM initialization:", error);
+          document.getElementById('root').innerText = "WASM failed to load. Check console.";
+        }
+      })();
+    </script>
+  </body>
+</html>
