@@ -138,8 +138,8 @@ impl Component for Model {
                     oxygen_concentration,
                 );
                 self.debug_log.push(log_entry);
-                if self.debug_log.len() > 50 {
-                    self.debug_log.drain(0..(self.debug_log.len() - 50));
+                if self.debug_log.len() > 120 {
+                    self.debug_log.drain(0..(self.debug_log.len() - 120));
                 }
                 
                 true
