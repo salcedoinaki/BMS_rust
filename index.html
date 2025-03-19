@@ -1,26 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
-    <title>BMS Simulation</title>
-    <base href="/BMS_rust/"> 
-<link rel="modulepreload" href="/bms_rust.js" crossorigin="anonymous" integrity="sha384-V/2zkPkJUyge6v9V8p9jEC6p+4peSxpZdHrRQvbE1QrM98JK/lk3EEaqsnjipH28"><link rel="preload" href="/bms_rust_bg.wasm" crossorigin="anonymous" integrity="sha384-1Ft9sVKsGSTGVI7O2HsVExHqcilO3AH81BkxxfufYyQOTt/xIh1R5xAgB2ahQpcL" as="fetch" type="application/wasm"></head>
-<body>
+    <title>BMS Simulation Test</title>
+    <base href="./">
+  </head>
+  <body>
     <div id="root"></div>
+    
     <script type="module">
-        import init from "./bms_rust.js";
-        init();
+      console.log("Starting WASM initialization test...");
+
+      import init, * as bindings from './bms_rust.js';
+      (async () => {
+        try {
+          const wasm = await init({ module_or_path: './bms_rust_bg.wasm' });
+          console.log("WASM module loaded successfully:", wasm);
+          window.wasmBindings = bindings;
+          // Update the page so you can see something:
+          document.getElementById('root').innerText = "WASM loaded successfully!";
+        } catch (error) {
+          console.error("Error during WASM initialization:", error);
+          document.getElementById('root').innerText = "WASM failed to load. Check console.";
+        }
+      })();
     </script>
-
-<script type="module">
-import init, * as bindings from '/bms_rust.js';
-const wasm = await init({ module_or_path: '/bms_rust_bg.wasm' });
-
-
-window.wasmBindings = bindings;
-
-
-dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
-
-</script></body>
+  </body>
 </html>
