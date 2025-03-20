@@ -3,9 +3,8 @@
   <head>
     <meta charset="UTF-8">
     <title>BMS Simulation Test</title>
-    <link rel="modulepreload" href="bms_rust.js" crossorigin="anonymous">
-    <link rel="preload" href="bms_rust_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
-  </head>
+    <base href="./">
+  <link rel="modulepreload" href="/bms_rust.js" crossorigin="anonymous" integrity="sha384-KKZSIvZ8Pu0wNiZsc/vaUrfcnG61o/TcuHG3OvOBrVD9vOCJspc75cVUtrMtLTeF"><link rel="preload" href="/bms_rust_bg.wasm" crossorigin="anonymous" integrity="sha384-lF7GxX9Hl7KFhfiEs/Azz7IpHvWkLLw5O2kwALpzLzYR6OjEhber2Uw0WeppwcqC" as="fetch" type="application/wasm"></head>
   <body>
     <div id="root"></div>
     
@@ -18,27 +17,24 @@
           const wasm = await init({ module_or_path: './bms_rust_bg.wasm' });
           console.log("WASM module loaded successfully:", wasm);
           window.wasmBindings = bindings;
-
-          document.addEventListener("DOMContentLoaded", () => {
-            const root = document.getElementById("root");
-            if (root) {
-              root.innerText = "WASM loaded successfully!";
-            } else {
-              console.error("Error: 'root' element not found.");
-            }
-          });
-
-          dispatchEvent(new CustomEvent("TrunkApplicationStarted", { detail: { wasm } }));
+          // Optionally update the page so you can see something:
+          document.getElementById('root').innerText = "WASM loaded successfully!";
         } catch (error) {
           console.error("Error during WASM initialization:", error);
-          document.addEventListener("DOMContentLoaded", () => {
-            const root = document.getElementById("root");
-            if (root) {
-              root.innerText = "WASM failed to load. Check console.";
-            }
-          });
+          document.getElementById('root').innerText = "WASM failed to load. Check console.";
         }
       })();
     </script>
-  </body>
+  
+<script type="module">
+import init, * as bindings from '/bms_rust.js';
+const wasm = await init({ module_or_path: '/bms_rust_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script></body>
 </html>

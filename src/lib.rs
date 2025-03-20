@@ -35,20 +35,16 @@ struct Model {
 impl Model {
     /// Sends simulation metrics to InfluxDB using InfluxDB line protocol.
     fn send_metrics(&self) {
-        // Get current time in nanoseconds
+        // Get current time in nanoseconds.
         let timestamp_ns = (js_sys::Date::now() * 1_000_000.0) as i64;
         
-        // Convert booleans to integers (1 for true, 0 for false)
+        // Convert booleans to integers (1 for true, 0 for false).
         let charging = if self.charging_mode { 1 } else { 0 };
         let cooling = if self.cooling_active { 1 } else { 0 };
     
-        // Create a line of data with multiple fields (uncomment and adjust fields as needed)
+        // Corrected line protocol: each field has a key.
         let line = format!(
-            "bms_metrics,sim_id=1 \
-             voltage={},current={},={},hydration={},
-             oxygen={},soc={},battery_voltage={},battery_current={},
-             battery_temp={},manifold_pressure={},compressor_speed={},charging_mode={},
-             cooling_active={} {}",
+            "bms_metrics,sim_id=1 voltage={},current={},fuel_cell_temperature={},hydration={},oxygen={},soc={},battery_voltage={},battery_current={},battery_temp={},manifold_pressure={},compressor_speed={},charging_mode={},cooling_active={} {}",
             self.fuel_cell.voltage,
             self.fuel_cell.current,
             self.fuel_cell.temperature,
@@ -59,23 +55,21 @@ impl Model {
             self.battery.current,
             self.battery.temperature,
             self.air_supply.manifold.pressure,
-            self.air_supply.compressor.speed
+            self.air_supply.compressor.speed,
             charging,
             cooling,
             timestamp_ns
         );
         
-        // Print the line for debugging purposes (optional)
         log::debug!("Sending data to InfluxDB: {}", line);
     
-        // Use spawn_local to send the HTTP POST asynchronously
+        // Use spawn_local to send the HTTP POST asynchronously.
         wasm_bindgen_futures::spawn_local(async move {
-            // Send the POST request to InfluxDB's write endpoint
             let result = gloo_net::http::Request::post("http://localhost:8086/write?db=bms_db")
                 .body(line)
                 .send()
                 .await;
-    
+        
             match result {
                 Ok(response) => {
                     if response.ok() {
@@ -90,7 +84,6 @@ impl Model {
             }
         });
     }
-    
 }
 /// Messages for our Yew component.
 enum Msg {
