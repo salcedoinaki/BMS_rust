@@ -3,8 +3,9 @@
   <head>
     <meta charset="UTF-8">
     <title>BMS Simulation Test</title>
-    <base href="./">
-  <link rel="modulepreload" href="/bms_rust.js" crossorigin="anonymous" integrity="sha384-JGGyTnEW4b7TqVKoyGy/Wljc9uIRBRzhYXld/E9GvXWoXX0cicQjjXHCq40PAKoe"><link rel="preload" href="/bms_rust_bg.wasm" crossorigin="anonymous" integrity="sha384-Q3Y41CMuHkZFI4xJbtAmyOj63p5cFAEjT3GBK3rEATmzPi/Cif24y1N9w4/wAswv" as="fetch" type="application/wasm"></head>
+    <link rel="modulepreload" href="bms_rust.js" crossorigin="anonymous">
+    <link rel="preload" href="bms_rust_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
+  </head>
   <body>
     <div id="root"></div>
     
@@ -17,24 +18,27 @@
           const wasm = await init({ module_or_path: './bms_rust_bg.wasm' });
           console.log("WASM module loaded successfully:", wasm);
           window.wasmBindings = bindings;
-          // Optionally update the page so you can see something:
-          document.getElementById('root').innerText = "WASM loaded successfully!";
+
+          document.addEventListener("DOMContentLoaded", () => {
+            const root = document.getElementById("root");
+            if (root) {
+              root.innerText = "WASM loaded successfully!";
+            } else {
+              console.error("Error: 'root' element not found.");
+            }
+          });
+
+          dispatchEvent(new CustomEvent("TrunkApplicationStarted", { detail: { wasm } }));
         } catch (error) {
           console.error("Error during WASM initialization:", error);
-          document.getElementById('root').innerText = "WASM failed to load. Check console.";
+          document.addEventListener("DOMContentLoaded", () => {
+            const root = document.getElementById("root");
+            if (root) {
+              root.innerText = "WASM failed to load. Check console.";
+            }
+          });
         }
       })();
     </script>
-  
-<script type="module">
-import init, * as bindings from '/bms_rust.js';
-const wasm = await init({ module_or_path: '/bms_rust_bg.wasm' });
-
-
-window.wasmBindings = bindings;
-
-
-dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
-
-</script></body>
+  </body>
 </html>
