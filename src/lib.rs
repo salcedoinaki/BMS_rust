@@ -9,6 +9,10 @@ use control::{OxygenController, AirSupplyController, BatteryController}; // Remo
 use wasm_bindgen::prelude::*; // for #[wasm_bindgen(start)]
 use yew::prelude::*;          // for Yew components
 use gloo::timers::callback::Interval; // for periodic updates
+use wasm_bindgen_futures::spawn_local;
+use gloo_net::http::Request;
+use js_sys::Date;
+
 
 /// The main GUI model for our simulation.
 struct Model {
@@ -26,6 +30,34 @@ struct Model {
     simulation_duration: f64, // Total simulation duration (e.g., 60 seconds)
 }
 
+impl Model {
+    /// Sends simulation metrics to InfluxDB using InfluxDB line protocol.
+    fn send_metrics(&self) {
+        // Get current time in nanoseconds.
+        let timestamp_ns = (Date::now() * 1_000_000.0) as i64;
+        let line = format!(
+            "fuel_cell_metrics,sim_id=1 voltage={},current={},temperature={},hydration={},soc={},manifold_pressure={},oxygen={} {}",
+            self.fuel_cell.voltage,
+            self.fuel_cell.current,
+            self.fuel_cell.temperature,
+            self.fuel_cell.membrane_hydration,
+            self.fuel_cell.oxygen_concentration,
+            self.battery.soc,
+            self.battery.voltage,
+            self.battery.current,
+            self.battery.temperature,
+            self.air_supply.manifold.pressure,
+            self.air_supply.compressor.speed,
+            timestamp_ns
+        );
+        spawn_local(async move {
+            let _ = Request::post("http://localhost:8086/write?db=bms_db")
+                .body(line)
+                .send()
+                .await;
+        });
+    }
+}
 /// Messages for our Yew component.
 enum Msg {
     Tick,
@@ -141,7 +173,7 @@ impl Component for Model {
                 if self.debug_log.len() > 120 {
                     self.debug_log.drain(0..(self.debug_log.len() - 120));
                 }
-                
+                self.send_metrics();
                 true
             }
         }
